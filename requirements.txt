@@ -1,3 +1,7 @@
 pillow
-openai
+tk
+pytesseract
+requests
+google-generativeai
 python-dotenv
+opencv-python

@@ -1,19 +1,27 @@
 from io import BytesIO
 import tkinter as tk
 from PIL import Image, ImageDraw, ImageFont
-from openai import OpenAI
-from tkinter import font as tkFont
-import base64
-
+import pytesseract
 import os
+from tkinter import font as tkFont
 from dotenv import load_dotenv
+import google.generativeai as genai
 
+import cv2
+import numpy as np
+
+# Load environment variables
 load_dotenv()
+
+# Configure Gemini API
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+model = genai.GenerativeModel("gemini-1.5-flash")
+
 
 class DrawingApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("AI Math Notes")
+        self.root.title("Gemini AI Math Notes")
 
         self.canvas_width = 1200
         self.canvas_height = 800
@@ -27,8 +35,6 @@ class DrawingApp:
         self.canvas.bind("<Button-1>", self.start_draw)
         self.canvas.bind("<B1-Motion>", self.paint)
         self.canvas.bind("<ButtonRelease-1>", self.reset)
-        self.root.bind("<Command-z>", self.command_undo)
-        self.root.bind("<Return>", self.command_calculate)  # Bind Enter key to calculate
 
         self.last_x, self.last_y = None, None
         self.current_action = []
@@ -40,12 +46,33 @@ class DrawingApp:
         self.button_undo = tk.Button(root, text="Undo (Cmd/Ctrl Z)", command=self.undo)
         self.button_undo.pack(side=tk.LEFT)
 
-        self.button_calculate = tk.Button(root, text="Calculate (Return/Enter)", command=self.calculate)
+        self.button_calculate = tk.Button(root, text="Calculate", command=self.calculate)
         self.button_calculate.pack(side=tk.LEFT)
 
         self.custom_font = tkFont.Font(family="Noteworthy", size=100)
 
-        self.client = OpenAI()
+        # Bind the Enter key to the calculate function
+        self.root.bind("<Return>", self.handle_enter_key)
+
+    def preprocess_image(self, pil_image):
+        # Convert PIL Image to OpenCV format
+        open_cv_image = np.array(pil_image)
+        open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
+
+        # Apply thresholding
+        _, binary_image = cv2.threshold(open_cv_image, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+        # Remove noise
+        kernel = np.ones((1, 1), np.uint8)
+        denoised_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, kernel)
+
+        # Resize for better OCR
+        resized_image = cv2.resize(denoised_image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+        return resized_image
+
+    def handle_enter_key(self, event):
+        self.calculate()
 
     def start_draw(self, event):
         self.current_action = []
@@ -77,9 +104,6 @@ class DrawingApp:
                 self.canvas.delete(line_id)
             self.redraw_all()
 
-    def command_undo(self, event):
-        self.undo()
-
     def redraw_all(self):
         self.image = Image.new("RGB", (self.canvas_width, self.canvas_height), (0, 0, 0))
         self.draw = ImageDraw.Draw(self.image)
@@ -90,57 +114,65 @@ class DrawingApp:
                 self.canvas.create_line(coords, fill='white', width=5)
 
     def calculate(self):
-        def encode_image_to_base64(image):
-            buffered = BytesIO()
-            image.save(buffered, format="PNG")
-            return base64.b64encode(buffered.getvalue()).decode('utf-8')
-            
-        base64_image = encode_image_to_base64(self.image)
+        # Preprocess the image
+        processed_image = self.preprocess_image(self.image)
 
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Give the answer to this math equation. Only respond with the answer. Only respond with numbers. NEVER Words. Only answer unanswered expressions. Look for equal sign with nothing on the right of it. If it has an answer already. DO NOT ANSWER it."},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{base64_image}",},
-                        },
-                    ],
-                }
-            ],
-            max_tokens=300,
-        )
+        # Convert back to PIL for Tesseract
+        pil_image = Image.fromarray(processed_image)
 
-        answer = response.choices[0].message.content
-        self.draw_answer(answer)
-        # print(answer)
+        # Extract text using Tesseract
+        text = pytesseract.image_to_string(pil_image, config="--psm 7").strip()
+        print(f"Extracted text from canvas: {text}")  # Debugging: Print extracted text
 
-    def command_calculate(self, event):
-        self.calculate()
+        # Query the Gemini API
+        answer = self.query_gemini(text)
+
+        # Draw the answer on the canvas
+        if answer:
+            self.draw_answer(answer)
+        else:
+            print("No answer generated.")
+
+
+    def query_gemini(self, text):
+        try:
+            # Modify the prompt to explicitly ask for just the answer
+            prompt = f"Return only the answer for: {text}"
+            print(f"Query sent to Gemini: {prompt}")  # Debugging: Print the refined prompt
+
+            # Generate content using the documented method
+            response = model.generate_content(prompt)
+            print(f"Response from Gemini: {response}")  # Debugging: Print the response
+
+            # Extract and return the generated text
+            if response:
+                return response.text.strip()  # Ensure the response is clean
+            else:
+                return "Error: No response generated."
+        except Exception as e:
+            print(f"Error querying Gemini API: {e}")
+            return "Error"
+
 
     def draw_answer(self, answer):
-        # Find the position of the last equals sign drawn
         if not self.actions:
             return
-        
+
+        # Position the result next to the last equals sign
         last_action = self.actions[-1]
         last_coords = last_action[-1][-1]
 
         equals_x = last_coords[2]
         equals_y = last_coords[3]
 
-        # Set the position to draw the answer
         x_start = equals_x + 70
         y_start = equals_y - 20
 
-        # Draw the text using the custom font
+        # Draw the answer on the canvas
         self.canvas.create_text(x_start, y_start, text=answer, font=self.custom_font, fill="#FF9500")
-
-        font = ImageFont.load_default(size=100)
+        font = ImageFont.load_default()
         self.draw.text((x_start, y_start - 50), answer, font=font, fill="#FF9500")
+
 
 if __name__ == "__main__":
     root = tk.Tk()

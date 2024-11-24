@@ -5,6 +5,11 @@ from openai import OpenAI
 from tkinter import font as tkFont
 import base64
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 class DrawingApp:
     def __init__(self, root):
         self.root = root

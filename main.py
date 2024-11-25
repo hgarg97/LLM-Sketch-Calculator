@@ -75,34 +75,27 @@ class DrawingApp:
         open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
 
         # Step 2: Apply Adaptive Thresholding for Better Contrast
-        binary_image = cv2.adaptiveThreshold(
-            open_cv_image, 
-            255, 
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY, 
-            11, 
-            2
-        )
+        ret, binary_image = cv2.threshold(open_cv_image, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
 
         # Use matplotlib to show the binary image
-        self.display_image(binary_image, title="Binary Image")
+        # self.display_image(binary_image, title="Binary Image")
 
 
         # Step 3: Remove Noise with Gaussian Blur
         blurred_image = cv2.GaussianBlur(binary_image, (5, 5), 0)
 
-        self.display_image(blurred_image, title="Blurred Image")
+        # self.display_image(blurred_image, title="Blurred Image")
 
         # Step 4: Morphological Transformations for Noise Removal
         kernel = np.ones((1, 1), np.uint8)
         cleaned_image = cv2.morphologyEx(blurred_image, cv2.MORPH_CLOSE, kernel)
 
-        self.display_image(cleaned_image, title="Cleaned Image")
+        # self.display_image(cleaned_image, title="Cleaned Image")
 
         # Step 5: Resize the Image for Better OCR Accuracy
         resized_image = cv2.resize(cleaned_image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
 
-        self.display_image(resized_image, title="Resized Image")
+        # self.display_image(resized_image, title="Resized Image")
 
         return resized_image
 
@@ -153,11 +146,14 @@ class DrawingApp:
         # Preprocess the image
         processed_image = self.preprocess_image(self.image)
 
-        # Convert back to PIL for Tesseract
+       # Convert back to PIL for Tesseract
         pil_image = Image.fromarray(processed_image)
         
-        # Extract text using Tesseract
-        text = pytesseract.image_to_string(pil_image, config="--psm 6")
+        # Define the whitelist of characters to include only digits and operators
+        custom_config = r'--psm 6 -c tessedit_char_whitelist=0123456789+-*/()=.'  # Including operators and parentheses
+
+        # Extract text using Tesseract (only digits and operators)
+        text = pytesseract.image_to_string(pil_image, config=custom_config)
         print(f"Extracted text from canvas: {text}")  # Debugging: Print extracted text
 
         # Query the Gemini API

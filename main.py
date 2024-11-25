@@ -10,6 +10,8 @@ import google.generativeai as genai
 import cv2
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 # Load environment variables
 load_dotenv()
 
@@ -60,6 +62,11 @@ class DrawingApp:
         # Bind the Enter key to the calculate function
         self.root.bind("<Return>", self.handle_enter_key)
 
+    def display_image(self, image, title="Image"):
+        plt.imshow(image, cmap='gray')
+        plt.title(title)
+        plt.axis('off')
+        plt.show()
 
     def preprocess_image(self, pil_image):
 
@@ -77,15 +84,25 @@ class DrawingApp:
             2
         )
 
+        # Use matplotlib to show the binary image
+        self.display_image(binary_image, title="Binary Image")
+
+
         # Step 3: Remove Noise with Gaussian Blur
         blurred_image = cv2.GaussianBlur(binary_image, (5, 5), 0)
+
+        self.display_image(blurred_image, title="Blurred Image")
 
         # Step 4: Morphological Transformations for Noise Removal
         kernel = np.ones((1, 1), np.uint8)
         cleaned_image = cv2.morphologyEx(blurred_image, cv2.MORPH_CLOSE, kernel)
 
+        self.display_image(cleaned_image, title="Cleaned Image")
+
         # Step 5: Resize the Image for Better OCR Accuracy
         resized_image = cv2.resize(cleaned_image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+        self.display_image(resized_image, title="Resized Image")
 
         return resized_image
 
@@ -140,7 +157,7 @@ class DrawingApp:
         pil_image = Image.fromarray(processed_image)
         
         # Extract text using Tesseract
-        text = pytesseract.image_to_string(pil_image, config="--psm 7").strip()
+        text = pytesseract.image_to_string(pil_image, config="--psm 6")
         print(f"Extracted text from canvas: {text}")  # Debugging: Print extracted text
 
         # Query the Gemini API

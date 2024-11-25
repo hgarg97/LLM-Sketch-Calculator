@@ -5,3 +5,4 @@ requests
 google-generativeai
 python-dotenv
 opencv-python
+matplotlib

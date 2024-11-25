@@ -26,8 +26,23 @@ class DrawingApp:
         self.canvas_width = 1200
         self.canvas_height = 800
 
+        # Create a frame for the buttons
+        button_frame = tk.Frame(root)
+        button_frame.pack(side=tk.TOP, fill=tk.X)
+
+        # Add buttons to the button frame
+        self.button_clear = tk.Button(button_frame, text="Clear", command=self.clear)
+        self.button_clear.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.button_undo = tk.Button(button_frame, text="Undo (Cmd/Ctrl Z)", command=self.undo)
+        self.button_undo.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.button_calculate = tk.Button(button_frame, text="Calculate", command=self.calculate)
+        self.button_calculate.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Create the canvas
         self.canvas = tk.Canvas(root, bg='black', width=self.canvas_width, height=self.canvas_height)
-        self.canvas.pack()
+        self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self.image = Image.new("RGB", (self.canvas_width, self.canvas_height), (0, 0, 0))
         self.draw = ImageDraw.Draw(self.image)
@@ -40,36 +55,40 @@ class DrawingApp:
         self.current_action = []
         self.actions = []
 
-        self.button_clear = tk.Button(root, text="Clear", command=self.clear)
-        self.button_clear.pack(side=tk.LEFT)
-
-        self.button_undo = tk.Button(root, text="Undo (Cmd/Ctrl Z)", command=self.undo)
-        self.button_undo.pack(side=tk.LEFT)
-
-        self.button_calculate = tk.Button(root, text="Calculate", command=self.calculate)
-        self.button_calculate.pack(side=tk.LEFT)
-
-        self.custom_font = tkFont.Font(family="Noteworthy", size=100)
+        self.custom_font = tkFont.Font(family="Noteworthy", size=20)
 
         # Bind the Enter key to the calculate function
         self.root.bind("<Return>", self.handle_enter_key)
 
+
     def preprocess_image(self, pil_image):
-        # Convert PIL Image to OpenCV format
+
+        # Step 1: Convert PIL Image to OpenCV Format
         open_cv_image = np.array(pil_image)
         open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
 
-        # Apply thresholding
-        _, binary_image = cv2.threshold(open_cv_image, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        # Step 2: Apply Adaptive Thresholding for Better Contrast
+        binary_image = cv2.adaptiveThreshold(
+            open_cv_image, 
+            255, 
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY, 
+            11, 
+            2
+        )
 
-        # Remove noise
+        # Step 3: Remove Noise with Gaussian Blur
+        blurred_image = cv2.GaussianBlur(binary_image, (5, 5), 0)
+
+        # Step 4: Morphological Transformations for Noise Removal
         kernel = np.ones((1, 1), np.uint8)
-        denoised_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, kernel)
+        cleaned_image = cv2.morphologyEx(blurred_image, cv2.MORPH_CLOSE, kernel)
 
-        # Resize for better OCR
-        resized_image = cv2.resize(denoised_image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        # Step 5: Resize the Image for Better OCR Accuracy
+        resized_image = cv2.resize(cleaned_image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
 
         return resized_image
+
 
     def handle_enter_key(self, event):
         self.calculate()
@@ -119,7 +138,7 @@ class DrawingApp:
 
         # Convert back to PIL for Tesseract
         pil_image = Image.fromarray(processed_image)
-
+        
         # Extract text using Tesseract
         text = pytesseract.image_to_string(pil_image, config="--psm 7").strip()
         print(f"Extracted text from canvas: {text}")  # Debugging: Print extracted text

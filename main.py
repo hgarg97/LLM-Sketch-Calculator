@@ -75,20 +75,19 @@ class DrawingApp:
         open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
 
         # Step 2: Apply Adaptive Thresholding for Better Contrast
-        ret, binary_image = cv2.threshold(open_cv_image, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
 
-        # Use matplotlib to show the binary image
+        blurred_image = cv2.GaussianBlur(open_cv_image, (5, 5), 0)
+        # self.display_image(blurred_image, title="Blurred Image")
+        ret, binary_image = cv2.threshold(blurred_image, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
         # self.display_image(binary_image, title="Binary Image")
 
-
-        # Step 3: Remove Noise with Gaussian Blur
-        blurred_image = cv2.GaussianBlur(binary_image, (5, 5), 0)
-
-        # self.display_image(blurred_image, title="Blurred Image")
+        binary_image_resized = cv2.resize(binary_image, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+        # self.display_image(binary_image_resized, title="Binary Image resized")
 
         # Step 4: Morphological Transformations for Noise Removal
-        kernel = np.ones((1, 1), np.uint8)
-        cleaned_image = cv2.morphologyEx(blurred_image, cv2.MORPH_CLOSE, kernel)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        cleaned_image = cv2.dilate(binary_image_resized, kernel, iterations=1)
 
         # self.display_image(cleaned_image, title="Cleaned Image")
 
@@ -169,7 +168,9 @@ class DrawingApp:
     def query_gemini(self, text):
         try:
             # Modify the prompt to explicitly ask for just the answer
-            prompt = f"Return only the answer for: {text}"
+            prompt = f'''You are mathematical calculator, the text provided to you is drawn by hand and extracted using OCR techniques, 
+            we are drawing digits and operators in a human way ending with '=', return only the solved answer for {text} \n 
+            If the text provided doesn't make sense return 'NaN' '''
             print(f"Query sent to Gemini: {prompt}")  # Debugging: Print the refined prompt
 
             # Generate content using the documented method
@@ -200,10 +201,14 @@ class DrawingApp:
         x_start = equals_x + 70
         y_start = equals_y - 20
 
-        # Draw the answer on the canvas
+        # Determine an appropriate font size based on canvas size and content
+        scale_factor = 2  # Adjust scale factor based on desired size
+        font_size = int(self.canvas_width // scale_factor)
+        font = ImageFont.truetype("arial.ttf", font_size)  # Use a scalable font
+
+        # Draw the answer dynamically on both the canvas and PIL image
         self.canvas.create_text(x_start, y_start, text=answer, font=self.custom_font, fill="#FF9500")
-        font = ImageFont.load_default()
-        self.draw.text((x_start, y_start - 50), answer, font=font, fill="#FF9500")
+        self.draw.text((x_start, y_start), answer, font=font, fill="#FF9500")
 
 
 if __name__ == "__main__":

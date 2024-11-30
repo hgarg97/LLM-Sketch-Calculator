@@ -1,6 +1,6 @@
 # LLM Sketch Calculator
 
-Gemini AI Math Notes is an interactive drawing application that allows users to draw mathematical equations on a canvas and get the result displayed in real-time. This tool leverages Optical Character Recognition (OCR) to interpret handwritten equations and a multimodal Generative AI model (Gemini API) to calculate the result.
+LLM Sketch Calculator is an interactive drawing application that allows users to draw mathematical equations on a canvas and get the result displayed in real-time. This tool leverages Optical Character Recognition (OCR) to interpret handwritten equations and a multimodal Generative AI model (Gemini API) to calculate the result.
 
 ---
 

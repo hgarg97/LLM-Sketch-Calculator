@@ -1,4 +1,4 @@
-# Gemini AI Math Notes
+# LLM Sketch Calculator
 
 Gemini AI Math Notes is an interactive drawing application that allows users to draw mathematical equations on a canvas and get the result displayed in real-time. This tool leverages Optical Character Recognition (OCR) to interpret handwritten equations and a multimodal Generative AI model (Gemini API) to calculate the result.
 
@@ -74,7 +74,7 @@ Ensure that Tesseract is installed on your system:
    ```
 2. Navigate to the project directory:
    ```bash
-   cd AI-Math-Notes
+   cd LLM-Sketch-Calculator
    ```
 3. Run the application:
    ```bash
